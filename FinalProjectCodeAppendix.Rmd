@@ -1,0 +1,218 @@
+---
+title: "Predicitive NBA Over/Under Models and Analysis Code Appendix"
+author: "Ethan Lewis"
+date: "3/30/2021"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+\tableofcontents
+\listoftables
+\newpage
+
+```{r}
+NBA <- read.csv("~/Downloads/STA/STA 363/NBA.csv")
+#Load Data
+```
+
+```{r}
+suppressMessages(library(lmf))
+suppressMessages(library(caret))
+suppressMessages(library(glmnet))
+suppressMessages(library(plotly))
+suppressMessages(library(randomForest))
+#Load packages
+```
+
+## Abstract
+
+No Code  
+
+## 1.1 Data and Motivation
+
+No Code 
+
+## 2.1 Data Cleaning
+
+```{r}
+NBA$Total <- NBA$teamPTS + NBA$opptPTS
+#Create response variable
+```
+
+```{r}
+NBA1 <- NBA[,-c(2,8,9,11,12,14,15,17,18,20,21,22,34,35,37,41,47,48,50,51,53,54,56,57,59,60,61,73,74,76)]
+#Remove chosen columns (NEED TO EXPLAIN WHY)
+```
+
+```{r}
+NBA1$teamTREB. <- NBA1$teamTREB. / 100
+NBA1$teamASST. <- NBA1$teamASST. / 100
+NBA1$teamOREB. <- NBA1$teamOREB. / 100
+NBA1$teamDREB. <- NBA1$teamDREB. / 100
+NBA1$teamTO. <- NBA1$teamTO. / 100
+NBA1$teamSTL. <- NBA1$teamSTL. / 100
+NBA1$teamBLK. <- NBA1$teamBLK. / 100
+#Convert team values to decimal percentages
+```
+
+```{r}
+NBA1$opptTREB. <- NBA1$opptTREB. / 100
+NBA1$opptASST. <- NBA1$opptASST. / 100
+NBA1$opptOREB. <- NBA1$opptOREB. / 100
+NBA1$opptDREB. <- NBA1$opptDREB. / 100
+NBA1$opptTO. <- NBA1$opptTO. / 100
+NBA1$opptSTL. <- NBA1$opptSTL. / 100
+NBA1$opptBLK. <- NBA1$opptBLK. / 100
+#Convert opponent values to decimal percentages
+```
+
+## 3.1 Introduction
+
+No Code 
+
+## 3.2 EDA 
+
+```{r}
+NBA2 <- NBA1[,-c(15,16,39,40)]
+#Remove OREB and DREB columns
+#This should be in the original column removal chunk (Section 2.1)
+#Would take some additional time to fix. It is fine here
+```
+
+```{r, fig.asp=0.42, fig.show='hide'}
+hist(NBA2$Total , main = "Figure 3.2.1" , xlab = "Total")
+#Histogram of Total
+```
+
+```{r, results='hide'}
+sum(table(which(NBA2$Total>=259)))
+sum(table(which(NBA2$Total<=150)))
+#Count outliers
+```
+
+```{r}
+NBA3 <- NBA2[-c(which(NBA2$Total>=259),which(NBA2$Total<=150)),]
+#Remove outliers
+```
+
+```{r, fig.asp=0.9, fig.show='hide'}
+par(mfrow=c(2,1))
+boxplot(NBA2$Total , main = "Figure 3.2.2" , horizontal = TRUE)
+boxplot(NBA3$Total , main = "Figure 3.2.3" , horizontal = TRUE)
+#Box plot of Total
+```
+
+## 3.3 Elastic Net Test (100-Fold)
+
+```{r}
+elasticNet = train(Total~. , data = NBA3 , method = "glmnet" , trControl = trainControl(method = "cv" , number = 100))
+#Run 100-Fold Elastic Net 
+```
+
+```{r, results='hide'}
+elasticNet
+#Access metrics 
+```
+
+```{r, results='hide'}
+coef(elasticNet$finalModel , elasticNet$bestTune$lambda)
+#Access Coefficients 
+```
+
+```{r}
+Mat <- cbind(ElasticNet = coef(elasticNet$finalModel , elasticNet$bestTune$lambda))
+Mat <-as.matrix(Mat)
+colnames(Mat) <-c("Coefficients")
+Mat <- data.frame(Mat)
+#Elastic Net coefficient table set up
+```
+
+```{r, fig.show='hide'}
+knitr::kable(Mat, caption = "Table 3.3.1" , label = NULL)
+#Elastic Net coefficient table
+```
+
+## 3.4 Results
+
+```{r}
+May7Games <- read.csv("~/Downloads/STA/STA 363/May7Games.csv")
+#Import game data
+```
+
+```{r, results='hide'}
+predict(elasticNet , newdata = May7Games)
+#Make predictions with elastic net 
+```
+
+```{r}
+ElasticNetPreds <- read.csv("~/Downloads/STA/STA 363/ElasticNetPreds.csv")
+ElasticNetPreds <- ElasticNetPreds[,-c(7)]
+#Import prediction table
+```
+
+```{r, fig.show='hide'}
+knitr::kable(ElasticNetPreds, col.names = gsub("[.]", " ", names(ElasticNetPreds)), align = "lccccc", caption = "Table 3.4.1" , label = NULL)
+#Prediction table
+```
+
+## 4.1 Introduction
+
+No Code
+
+## 4.2 EDA
+
+No Code  
+
+## 4.3 Method
+
+```{r}
+set.seed(363)
+NBAForest <- randomForest(Total~. , data = NBA3 , mtry=sqrt(44) , importance=TRUE , ntree = 100 , compete=FALSE)
+#Train random forest (B=100)
+```
+
+```{r, results='hide'}
+NBAForest
+#Access RMSE
+```
+
+## 4.4 Results
+
+```{r, results='hide'}
+predict(NBAForest , newdata = May7Games)
+#Make predictions with random forest
+```
+
+```{r}
+RandomForestPreds <- read.csv("~/Downloads/STA/STA 363/RandomForestPreds.csv")
+#Import prediction table 
+```
+
+```{r, fig.show='hide'}
+knitr::kable(RandomForestPreds, col.names = gsub("[.]", " ", names(RandomForestPreds)), align = "lccccc", caption = "Table 4.4.1" , label = NULL)
+#Prediction table
+```
+
+```{r, fig.asp=1.5, fig.show='hide'}
+dotchart(importance(NBAForest)[,1] , xlab = "Percent Increase in OOB Error", main = "Figure 4.4.1")
+#Variable importance dot chart
+```
+
+## Conclusion
+
+No Code
+
+## Data Frame Works Cited
+
+No Code
+
+## Appendix 
+
+No Code
